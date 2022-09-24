@@ -5,16 +5,48 @@ const secp256k1 = require('secp256k1')
 const bip66 = require('bip66') // maybe merge (node modules)
 const bs58check = require('bs58check') // maybe merge (node modules)
 
-const OPS = require('bitcoin-ops') // merge (node modules)
+const BN = require('bn.js') // merge (node modules)
 const varuint = require('varuint-bitcoin') // merge (node modules)
 const pushdata = require('pushdata-bitcoin') // merge (node modules)
-
-const BufferCursor = require('./buffer-cursor') // merge (local)
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
 
+// https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
+const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, }
 
+class BufferCursor {
+  constructor(buffer) {
+    this._buffer = buffer;
+    this._position = 0;
+  }
+
+  writeUInt32LE(val) {
+    this._writeStandard(this.writeUInt32LE.name, val, 4);
+  }
+
+  writeInt32LE(val) {
+    this._writeStandard(this.writeInt32LE.name, val, 4);
+  }
+
+  writeUInt64LE(value) {
+    if (!(value instanceof BN)) value = new BN(value);
+    this.writeBytes(value.toBuffer('le', 8));
+  }
+
+  writeBytes(buffer) {
+    if (!buffer || !buffer.length) return;
+    if (this._position + buffer.length > this._buffer.length)
+      throw new RangeError('Index out of range');
+    buffer.copy(this._buffer, this._position);
+    this._position += buffer.length;
+  }
+
+  _writeStandard(fn, val, len) {
+    this._buffer[fn](val, this._position);
+    this._position += len;
+  }
+}
 
 
 
@@ -238,6 +270,7 @@ const pubKeySendTo = 'mrz1DDxeqypyabBs8N9y3Hybe2LEz2cYBu'
 
 const pubKey = secp256k1.publicKeyCreate(privKey)
 console.log('pubKey', pubKey.toString('hex'))
+console.log()
 
 
 
