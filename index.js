@@ -4,12 +4,11 @@ const secp256k1 = require('secp256k1')
 const base58 = require('bs58')
 
 
+// https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
+const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, OP_PUSHDATA1: 0x4c, }
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
-
-// https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
-const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, OP_PUSHDATA1: 0x4c, }
 
 class BufferCursor {
   constructor(buffer) {
@@ -126,28 +125,23 @@ const pushdataEncode = (buffer, number, offset) => {
   return size
 }
 
+const fromBase58Check = (address) => Buffer.from(base58.decode(address).slice(0, -4)).subarray(1)
 
-
-
-
-
-
-
-
-
-const cloneTx = (tx) => {
-  const result = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
-  for (let vin of tx.vins) {
-    result.vins.push({ txid: vin.txid, vout: vin.vout, hash: vin.hash,
-      sequence: vin.sequence, script: vin.script, scriptPub: null, })
-  }
-  for (let vout of tx.vouts) {
-    result.vouts.push({ script: vout.script, value: vout.value, })
-  }
-  return result
+const toDER = (x) => {
+  let i = 0
+  while (x[i] === 0) ++i
+  if (i === x.length) return Buffer.alloc(1)
+  x = x.slice(i)
+  if (x[0] & 0x80) return Buffer.concat([Buffer.alloc(1), x], 1 + x.length)
+  return x
 }
 
-// refer to https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/script.js#L35
+
+
+
+
+
+
 const compileScript = (chunks) => {
   const asMinimalOP = (buffer) => {
     if (buffer.length === 0) return OPS.OP_0
@@ -195,12 +189,6 @@ const compileScript = (chunks) => {
   })
   if (offset !== buffer.length) throw new Error('Could not decode chunks')
   return buffer
-}
-
-// refer to https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/address.js
-const fromBase58Check = (address) => {
-  const payload = Buffer.from(base58.decode(address).slice(0, -4))
-  return payload.slice(1)
 }
 
 // refer to https://en.bitcoin.it/wiki/Transaction#General_format_of_a_Bitcoin_transaction_.28inside_a_block.29
@@ -259,33 +247,23 @@ const txToBuffer = (tx) => {
   return buffer
 }
 
-// refer to: https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/script_signature.js
-const toDER = (x) => {
-  let i = 0
-  while (x[i] === 0) ++i
-  if (i === x.length) return Buffer.alloc(1)
-  x = x.slice(i)
-  if (x[0] & 0x80) return Buffer.concat([Buffer.alloc(1), x], 1 + x.length)
-  return x
-}
-
-// refer to: https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/script_signature.js
-const encodeSig = (signature, hashType) => {
-  const hashTypeMod = hashType & ~0x80
-  if (hashTypeMod <= 0 || hashTypeMod >= 4) throw new Error('Invalid hashType ' + hashType)
-
-  const hashTypeBuffer = Buffer.from([hashType])
-
-  const r = toDER(signature.slice(0, 32))
-  const s = toDER(signature.slice(32, 64))
-
-  return Buffer.concat([bip66Encode(r, s), hashTypeBuffer])
+const encodeSig = (sig, type) => {
+  const encoded = bip66Encode(toDER(sig.slice(0, 32)), toDER(sig.slice(32, 64)))
+  return Buffer.concat([encoded, Buffer.from([type])])
 }
 
 /////////////////////////////////////////
 
 const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
-  const clone = cloneTx(tx)
+
+  const clone = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
+  for (let vin of tx.vins) {
+    clone.vins.push({ txid: vin.txid, vout: vin.vout, hash: vin.hash,
+      sequence: vin.sequence, script: vin.script, scriptPub: null, })
+  }
+  for (let vout of tx.vouts) {
+    clone.vouts.push({ script: vout.script, value: vout.value, })
+  }
 
   // clean up relevant script
   const filteredPrevOutScript = clone.vins[vindex].script.filter(op => op !== OPS.OP_CODESEPARATOR)
