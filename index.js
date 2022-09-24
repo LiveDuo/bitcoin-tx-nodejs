@@ -305,4 +305,5 @@ console.log('Assert:', result === '0200000001a7e576b58b3d074e4c095b2e5557968523c
 // https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
 // https://en.bitcoin.it/wiki/Transaction#General_format_of_a_Bitcoin_transaction_.28inside_a_block.29
 // https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/payments/p2pkh.js#L58
+// https://www.derpturkey.com/bitcoin-p2pkh-exploration/
 
