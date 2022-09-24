@@ -13,34 +13,30 @@ const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG:
 
 class BufferCursor {
   constructor(buffer) {
-    this._buffer = buffer;
-    this._position = 0;
+    this._buffer = buffer
+    this._position = 0
   }
 
   writeUInt32LE(val) {
-    this._writeStandard(this.writeUInt32LE.name, val, 4);
+    this._buffer[this.writeUInt32LE.name](val, this._position)
+    this._position += 4
   }
 
   writeInt32LE(val) {
-    this._writeStandard(this.writeInt32LE.name, val, 4);
+    this._buffer[this.writeInt32LE.name](val, this._position)
+    this._position += 4
   }
 
   writeUInt64LE(value) {
     const s = Number(value).toString(16).padStart(16, '0')
-    this.writeBytes(Buffer.from(s, 'hex').reverse());
+    const d = Buffer.from(s, 'hex').reverse()
+    d.copy(this._buffer, this._position)
+    this._position += d.length
   }
 
   writeBytes(buffer) {
-    if (!buffer || !buffer.length) return;
-    if (this._position + buffer.length > this._buffer.length)
-      throw new RangeError('Index out of range');
-    buffer.copy(this._buffer, this._position);
-    this._position += buffer.length;
-  }
-
-  _writeStandard(fn, val, len) {
-    this._buffer[fn](val, this._position);
-    this._position += len;
+    buffer.copy(this._buffer, this._position)
+    this._position += buffer.length
   }
 }
 
@@ -102,12 +98,7 @@ const bip66Encode = (r, s) => {
   return signature
 }
 
-const pushdataEncodingLength = (i) => {
-  return i < OPS.OP_PUSHDATA1 ? 1
-  : i <= 0xff ? 2
-  : i <= 0xffff ? 3
-  : 5
-}
+const pushdataEncodingLength = (i) => i < OPS.OP_PUSHDATA1 ? 1 : i <= 0xff ? 2 : i <= 0xffff ? 3 : 5
 
 const pushdataEncode = (buffer, number, offset) => {
   const size = pushdataEncodingLength(number)
@@ -145,7 +136,7 @@ const pushdataEncode = (buffer, number, offset) => {
 
 
 const cloneTx = (tx) => {
-  let result = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
+  const result = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
   for (let vin of tx.vins) {
     result.vins.push({ txid: vin.txid, vout: vin.vout, hash: vin.hash,
       sequence: vin.sequence, script: vin.script, scriptPub: null, })
@@ -165,7 +156,7 @@ const compileScript = (chunks) => {
     if (buffer[0] === 0x81) return OPS.OP_1NEGATE
   }
 
-  let bufferSize = chunks.reduce((accum, chunk) => {
+  const bufferSize = chunks.reduce((accum, chunk) => {
     // data chunk
     if (Buffer.isBuffer(chunk)) {
       // adhere to BIP62.3, minimal push policy
@@ -178,7 +169,7 @@ const compileScript = (chunks) => {
     return accum + 1
   }, 0.0)
 
-  let buffer = Buffer.alloc(bufferSize)
+  const buffer = Buffer.alloc(bufferSize)
   let offset = 0
 
   chunks.forEach(chunk => {
@@ -208,7 +199,7 @@ const compileScript = (chunks) => {
 
 // refer to https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/address.js
 const fromBase58Check = (address) => {
-  let payload = Buffer.from(base58.decode(address).slice(0, -4))
+  const payload = Buffer.from(base58.decode(address).slice(0, -4))
   return payload.slice(1)
 }
 
@@ -229,8 +220,8 @@ const calcTxBytes = (vins, vouts) => {
 }
 
 const txToBuffer = (tx) => {
-  let buffer = Buffer.alloc(calcTxBytes(tx.vins, tx.vouts))
-  let cursor = new BufferCursor(buffer)
+  const buffer = Buffer.alloc(calcTxBytes(tx.vins, tx.vouts))
+  const cursor = new BufferCursor(buffer)
 
   // version
   cursor.writeInt32LE(tx.version)
@@ -294,10 +285,10 @@ const encodeSig = (signature, hashType) => {
 /////////////////////////////////////////
 
 const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
-  let clone = cloneTx(tx)
+  const clone = cloneTx(tx)
 
   // clean up relevant script
-  let filteredPrevOutScript = clone.vins[vindex].script.filter(op => op !== OPS.OP_CODESEPARATOR)
+  const filteredPrevOutScript = clone.vins[vindex].script.filter(op => op !== OPS.OP_CODESEPARATOR)
   clone.vins[vindex].script = filteredPrevOutScript
 
   // zero out scripts of other inputs
@@ -306,20 +297,16 @@ const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
     clone.vins[i].script = Buffer.alloc(0)
   }
 
-  // write to the buffer
+  // write to the buffer, extend and append hash type and append the hash type
   let buffer = txToBuffer(clone)
-
-  // extend and append hash type
   buffer = Buffer.alloc(buffer.length + 4, buffer)
-
-  // append the hash type
   buffer.writeInt32LE(hashType, buffer.length - 4)
 
   // double-sha256
-  let hash = sha256(sha256(buffer))
+  const hash = sha256(sha256(buffer))
 
   // sign input
-  let sig = secp256k1.sign(hash, privKey)
+  const sig = secp256k1.sign(hash, privKey)
 
   // encode
   return encodeSig(sig.signature, hashType)
