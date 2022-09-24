@@ -75,9 +75,9 @@ const varUintEncode = (number, buffer, offset) => {
 
 const varUintEncodingLength = (number) => (number < 0xfd ? 1 : number <= 0xffff ? 3 : number <= 0xffffffff ? 5 : 9)
 
-function bip66Encode (r, s) {
-  var lenR = r.length
-  var lenS = s.length
+const bip66Encode = (r, s) => {
+  const lenR = r.length
+  const lenS = s.length
   if (lenR === 0) throw new Error('R length is zero')
   if (lenS === 0) throw new Error('S length is zero')
   if (lenR > 33) throw new Error('R length is too long')
@@ -87,7 +87,7 @@ function bip66Encode (r, s) {
   if (lenR > 1 && (r[0] === 0x00) && !(r[1] & 0x80)) throw new Error('R value excessively padded')
   if (lenS > 1 && (s[0] === 0x00) && !(s[1] & 0x80)) throw new Error('S value excessively padded')
 
-  var signature = Buffer.allocUnsafe(6 + lenR + lenS)
+  const signature = Buffer.allocUnsafe(6 + lenR + lenS)
 
   // 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S]
   signature[0] = 0x30
@@ -102,17 +102,15 @@ function bip66Encode (r, s) {
   return signature
 }
 
-// var OPS = require('bitcoin-ops')
-
-function pushdataEncodingLength (i) {
+const pushdataEncodingLength = (i) => {
   return i < OPS.OP_PUSHDATA1 ? 1
   : i <= 0xff ? 2
   : i <= 0xffff ? 3
   : 5
 }
 
-function pushdataEncode (buffer, number, offset) {
-  var size = pushdataEncodingLength(number)
+const pushdataEncode = (buffer, number, offset) => {
+  const size = pushdataEncodingLength(number)
 
   // ~6 bit
   if (size === 1) {
@@ -211,9 +209,7 @@ const compileScript = (chunks) => {
 // refer to https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/address.js
 const fromBase58Check = (address) => {
   let payload = Buffer.from(base58.decode(address).slice(0, -4))
-  let version = payload.readUInt8(0)
-  let hash = payload.slice(1)
-  return { version, hash }
+  return payload.slice(1)
 }
 
 // refer to https://en.bitcoin.it/wiki/Transaction#General_format_of_a_Bitcoin_transaction_.28inside_a_block.29
@@ -363,7 +359,7 @@ const tx = { version: 2, locktime: 0, vins: [], vouts: [] }
 tx.vins.push({ txid: txid, vout: 1, hash: txid.reverse(), sequence: 0xffffffff, script: p2pkhScript(ripemd160(sha256(pubKey))), scriptSig: null, })
 
 // 3: add output for new address
-tx.vouts.push({ script: p2pkhScript(fromBase58Check(pubKeySendTo).hash), value: 900, })
+tx.vouts.push({ script: p2pkhScript(fromBase58Check(pubKeySendTo)), value: 900, })
 
 // 4: add output for change address
 tx.vouts.push({ script: p2pkhScript(ripemd160(sha256(pubKey))), value: 11010000, })
