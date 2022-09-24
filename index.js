@@ -325,7 +325,7 @@ const p2pkhScript = (hash160PubKey) => {
 
 const privKey = Buffer.from('60226ca8fb12f6c8096011f36c5028f8b7850b63d495bc45ec3ca478a29b473d', 'hex')
 
-const txid = Buffer.from('cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe', 'hex')
+const txid = Buffer.from('f633c7f9f445cc7a241da277169fcd23859657552e5b094c4e073d8bb576e5a7', 'hex')
 
 const pubKeySendTo = 'mrz1DDxeqypyabBs8N9y3Hybe2LEz2cYBu'
 
@@ -346,10 +346,10 @@ const tx = { version: 2, locktime: 0, vins: [], vouts: [] }
 tx.vins.push({ txid: txid, vout: 1, hash: txid.reverse(), sequence: 0xffffffff, script: p2pkhScript(ripemd160(sha256(pubKey))), scriptSig: null, })
 
 // 3: add output for new address
-tx.vouts.push({ script: p2pkhScript(fromBase58Check(pubKeySendTo)), value: 900, })
+tx.vouts.push({ script: p2pkhScript(fromBase58Check(pubKeySendTo)), value: 500, })
 
 // 4: add output for change address
-tx.vouts.push({ script: p2pkhScript(ripemd160(sha256(pubKey))), value: 11010000, })
+tx.vouts.push({ script: p2pkhScript(ripemd160(sha256(pubKey))), value: 1000, })
 
 // 5: now that tx is ready, sign and create script sig
 tx.vins[0].scriptSig = compileScript([signp2pkh(tx, 0, privKey, 0x1), pubKey])
@@ -359,17 +359,17 @@ const result = txToBuffer(tx).toString('hex')
 console.log('Tx:', result)
 console.log()
 
-console.log('Assert:', result === '0200000001fe9d7c4be76094189c396cc52b333364f06610fbd1fa95994f79ec8c869785cf010000006a473044022034903565f0c10373ad8884251c1af2b7f5ce029213f052ce10411c6ba090fac1022071f17d776536f800e5e24688ee2a341bbd05a776298287659005257e9948cf6f012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff0284030000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88acd0ffa700000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000')
+console.log('Assert:', result === '0200000001a7e576b58b3d074e4c095b2e5557968523cd9f1677a21d247acc45f4f9c733f6010000006a473044022005ec72191e65a8d182409591fc4bdc6b3b05c8e0319affe3a986388772ebb83302206f79e266e4189a941b6a1861772218e435ac20419db20af04b2fb2949e3ef9db012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02f4010000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88ace8030000000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000')
 
-// bitcoin-cli -testnet sendrawtransaction "0200000001fe9d7c4be76094189c396cc52b333364f06610fbd1fa95994f79ec8c869785cf010000006a473044022034903565f0c10373ad8884251c1af2b7f5ce029213f052ce10411c6ba090fac1022071f17d776536f800e5e24688ee2a341bbd05a776298287659005257e9948cf6f012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff0284030000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88acd0ffa700000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000"
+// bitcoin-cli -testnet sendrawtransaction "0200000001a7e576b58b3d074e4c095b2e5557968523cd9f1677a21d247acc45f4f9c733f6010000006a473044022005ec72191e65a8d182409591fc4bdc6b3b05c8e0319affe3a986388772ebb83302206f79e266e4189a941b6a1861772218e435ac20419db20af04b2fb2949e3ef9db012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02f4010000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88ace8030000000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000"
 // txid: 18dc4ec8eca873f93fcc4869f6eaf0624ca91efff0ad86c341cd7edd37a8ae35
 
-// curl --location --request POST 'https://btc.getblock.io/testnet/' --header 'x-api-key: -' --header 'Content-Type: application/json' --data-raw '{"jsonrpc": "2.0", "method": "sendrawtransaction", "params": ["010000000100a37b212f20b3b6e87b01092ae47bcf168cd2606365ee05fead7d71ef5a7500000000006b483045022100806242cce33dba47fab9e7c74b9abec50db45e8736e9316db4b84ec8b104b90e02200ae7806700305a032e81d8808945d34a994ff0d69088b3e2f2c31fac932c79fa012102509f050f2ea961a9cb4ce77f8de4ae16c78fd7c80b18ad0aa8fdc06dbd4cb4fcffffffff0110270000000000001976a914c7bdf425c28817bf605da1b0c93877400b58905088ac00000000"], "id": "getblock.io"}'
+// curl --location --request POST 'https://btc.getblock.io/testnet/' --header 'x-api-key: -' --header 'Content-Type: application/json' --data-raw '{"jsonrpc": "2.0", "method": "sendrawtransaction", "params": ["0200000001a7e576b58b3d074e4c095b2e5557968523cd9f1677a21d247acc45f4f9c733f6010000006a473044022005ec72191e65a8d182409591fc4bdc6b3b05c8e0319affe3a986388772ebb83302206f79e266e4189a941b6a1861772218e435ac20419db20af04b2fb2949e3ef9db012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02f4010000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88ace8030000000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000"], "id": "getblock.io"}'
 
 ///////////////////////////////////////////////////////////
 
-
-
+// Successful Tx: ee3b6f4d03e93d8a2d9e2364488fe2a390d553c45c4d45a67a37852ebbf4a88a (testnet)
+// https://live.blockcypher.com/btc-testnet/tx/ee3b6f4d03e93d8a2d9e2364488fe2a390d553c45c4d45a67a37852ebbf4a88a/
 
 
 
