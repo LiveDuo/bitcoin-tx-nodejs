@@ -1,22 +1,24 @@
-const OPS = require('bitcoin-ops');
-const secp256k1 = require('secp256k1');
-const bip66 = require('bip66');
-const bs58check = require('bs58check');
-const varuint = require('varuint-bitcoin');
-const pushdata = require('pushdata-bitcoin');
-const BufferCursor = require('./buffer-cursor');
-
 const crypto = require('crypto');
 
+const secp256k1 = require('secp256k1');
 
+const bip66 = require('bip66'); // maybe merge (node modules)
+const bs58check = require('bs58check'); // maybe merge (node modules)
+
+const OPS = require('bitcoin-ops'); // merge (node modules)
+const varuint = require('varuint-bitcoin'); // merge (node modules)
+const pushdata = require('pushdata-bitcoin'); // merge (node modules)
+
+const BufferCursor = require('./buffer-cursor'); // merge (local)
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
 
 const hash160 = (data) => ripemd160(sha256(data))
-// const hash256 = (data) => sha256(sha256(data))
 
-// module.exports = { sha256, ripemd160, hash160, hash256, }
+
+
+
 
 ////////////////////////////////////////////////////////////
 
