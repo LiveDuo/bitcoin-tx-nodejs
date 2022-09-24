@@ -3,9 +3,12 @@ const crypto = require('crypto')
 const secp256k1 = require('secp256k1')
 const base58 = require('bs58')
 
-
 // https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
 const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, OP_PUSHDATA1: 0x4c, }
+
+////////////////////////////////////////////////////////////
+/////   Utils
+////////////////////////////////////////////////////////////
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
@@ -68,7 +71,7 @@ const varUintEncode = (number, buffer, offset) => {
   return buffer
 }
 
-const varUintEncodingLength = (number) => (number < 0xfd ? 1 : number <= 0xffff ? 3 : number <= 0xffffffff ? 5 : 9)
+const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
 
 const bip66Encode = (r, s) => {
   const lenR = r.length
@@ -137,7 +140,9 @@ const toDER = (x) => {
 }
 
 
-
+////////////////////////////////////////////////////////////
+/////   Helpers
+////////////////////////////////////////////////////////////
 
 
 const compileScript = (chunks) => {
@@ -226,8 +231,6 @@ const txToBuffer = (tx) => {
   return buffer
 }
 
-/////////////////////////////////////////
-
 const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
 
   const clone = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
@@ -269,7 +272,8 @@ const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
 const p2pkhScript = (pubKey) => compileScript([ OPS.OP_DUP, OPS.OP_HASH160, pubKey, OPS.OP_EQUALVERIFY, OPS.OP_CHECKSIG ])
 
 
-
+////////////////////////////////////////////////////////////
+/////   Main
 ////////////////////////////////////////////////////////////
 
 const privKey = Buffer.from('60226ca8fb12f6c8096011f36c5028f8b7850b63d495bc45ec3ca478a29b473d', 'hex')
@@ -281,12 +285,6 @@ const pubKeySendTo = 'mrz1DDxeqypyabBs8N9y3Hybe2LEz2cYBu'
 const pubKey = secp256k1.publicKeyCreate(privKey)
 console.log('pubKey', pubKey.toString('hex'))
 console.log()
-
-
-
-
-
-////////////////////////////////////////////////////////////
 
 // 1: add inputs and output for new address and change address
 const vinScript = p2pkhScript(ripemd160(sha256(pubKey)))
@@ -309,16 +307,9 @@ console.log()
 
 console.log('Assert:', result === '0200000001a7e576b58b3d074e4c095b2e5557968523cd9f1677a21d247acc45f4f9c733f6010000006a473044022005ec72191e65a8d182409591fc4bdc6b3b05c8e0319affe3a986388772ebb83302206f79e266e4189a941b6a1861772218e435ac20419db20af04b2fb2949e3ef9db012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02f4010000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88ace8030000000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000')
 
-// bitcoin-cli -testnet sendrawtransaction "0200000001a7e576b58b3d074e4c095b2e5557968523cd9f1677a21d247acc45f4f9c733f6010000006a473044022005ec72191e65a8d182409591fc4bdc6b3b05c8e0319affe3a986388772ebb83302206f79e266e4189a941b6a1861772218e435ac20419db20af04b2fb2949e3ef9db012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02f4010000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88ace8030000000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000"
-// txid: 18dc4ec8eca873f93fcc4869f6eaf0624ca91efff0ad86c341cd7edd37a8ae35
 
 // curl --location --request POST 'https://btc.getblock.io/testnet/' --header 'x-api-key: -' --header 'Content-Type: application/json' --data-raw '{"jsonrpc": "2.0", "method": "sendrawtransaction", "params": ["0200000001a7e576b58b3d074e4c095b2e5557968523cd9f1677a21d247acc45f4f9c733f6010000006a473044022005ec72191e65a8d182409591fc4bdc6b3b05c8e0319affe3a986388772ebb83302206f79e266e4189a941b6a1861772218e435ac20419db20af04b2fb2949e3ef9db012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02f4010000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88ace8030000000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000"], "id": "getblock.io"}'
 
-///////////////////////////////////////////////////////////
-
 // Successful Tx: ee3b6f4d03e93d8a2d9e2364488fe2a390d553c45c4d45a67a37852ebbf4a88a (testnet)
 // https://live.blockcypher.com/btc-testnet/tx/ee3b6f4d03e93d8a2d9e2364488fe2a390d553c45c4d45a67a37852ebbf4a88a/
-
-
-
 
