@@ -140,23 +140,10 @@ const toDER = (x) => {
 
 
 
-
-
 const compileScript = (chunks) => {
-  const asMinimalOP = (buffer) => {
-    if (buffer.length === 0) return OPS.OP_0
-    if (buffer.length !== 1) return
-    if (buffer[0] >= 1 && buffer[0] <= 16) return OPS.OP_RESERVED + buffer[0]
-    if (buffer[0] === 0x81) return OPS.OP_1NEGATE
-  }
-
   const bufferSize = chunks.reduce((accum, chunk) => {
     // data chunk
     if (Buffer.isBuffer(chunk)) {
-      // adhere to BIP62.3, minimal push policy
-      if (chunk.length === 1 && asMinimalOP(chunk) !== undefined) {
-        return accum + 1
-      }
       return accum + pushdataEncodingLength(chunk.length) + chunk.length
     }
     // opcode
@@ -169,14 +156,6 @@ const compileScript = (chunks) => {
   chunks.forEach(chunk => {
     // data chunk
     if (Buffer.isBuffer(chunk)) {
-      // adhere to BIP62.3, minimal push policy
-      const opcode = asMinimalOP(chunk)
-      if (opcode !== undefined) {
-        buffer.writeUInt8(opcode, offset)
-        offset += 1
-        return
-      }
-
       offset += pushdataEncode(buffer, chunk.length, offset)
       chunk.copy(buffer, offset)
       offset += chunk.length
@@ -191,8 +170,8 @@ const compileScript = (chunks) => {
   return buffer
 }
 
-// refer to https://en.bitcoin.it/wiki/Transaction#General_format_of_a_Bitcoin_transaction_.28inside_a_block.29
-const calcTxBytes = (vins, vouts) => {
+// https://en.bitcoin.it/wiki/Transaction#General_format_of_a_Bitcoin_transaction_.28inside_a_block.29
+const getTxSize = (vins, vouts) => {
   return (
     4 + // version
     varUintEncodingLength(vins.length) +
@@ -208,7 +187,7 @@ const calcTxBytes = (vins, vouts) => {
 }
 
 const txToBuffer = (tx) => {
-  const buffer = Buffer.alloc(calcTxBytes(tx.vins, tx.vouts))
+  const buffer = Buffer.alloc(getTxSize(tx.vins, tx.vouts))
   const cursor = new BufferCursor(buffer)
 
   // version
@@ -247,11 +226,6 @@ const txToBuffer = (tx) => {
   return buffer
 }
 
-const encodeSig = (sig, type) => {
-  const encoded = bip66Encode(toDER(sig.slice(0, 32)), toDER(sig.slice(32, 64)))
-  return Buffer.concat([encoded, Buffer.from([type])])
-}
-
 /////////////////////////////////////////
 
 const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
@@ -284,18 +258,15 @@ const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
   const hash = sha256(sha256(buffer))
 
   // sign input
-  const sig = secp256k1.sign(hash, privKey)
+  const sig = secp256k1.sign(hash, privKey).signature
 
-  // encode
-  return encodeSig(sig.signature, hashType)
+  // encode sig
+  const encoded = bip66Encode(toDER(sig.slice(0, 32)), toDER(sig.slice(32, 64)))
+  return Buffer.concat([encoded, Buffer.from([hashType])])
 }
 
-// Refer to:
 // https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/payments/p2pkh.js#L58
-const p2pkhScript = (hash160PubKey) => {
-  // prettier-ignore
-  return compileScript([ OPS.OP_DUP, OPS.OP_HASH160, hash160PubKey, OPS.OP_EQUALVERIFY, OPS.OP_CHECKSIG ])
-}
+const p2pkhScript = (pubKey) => compileScript([ OPS.OP_DUP, OPS.OP_HASH160, pubKey, OPS.OP_EQUALVERIFY, OPS.OP_CHECKSIG ])
 
 
 
@@ -317,22 +288,21 @@ console.log()
 
 ////////////////////////////////////////////////////////////
 
-// 1: create base tx
-const tx = { version: 2, locktime: 0, vins: [], vouts: [] }
+// 1: add inputs and output for new address and change address
+const vinScript = p2pkhScript(ripemd160(sha256(pubKey)))
+const voutScript1 = p2pkhScript(fromBase58Check(pubKeySendTo))
+const voutScript2 = p2pkhScript(ripemd160(sha256(pubKey)))
+const tx = {
+  version: 2,
+  locktime: 0,
+  vins: [{ txid: txid, vout: 1, hash: txid.reverse(), sequence: 0xffffffff, script: vinScript, scriptSig: null, }],
+  vouts: [{ script: voutScript1, value: 500, }, { script: voutScript2, value: 1000, }]
+}
 
-// 2: add inputs
-tx.vins.push({ txid: txid, vout: 1, hash: txid.reverse(), sequence: 0xffffffff, script: p2pkhScript(ripemd160(sha256(pubKey))), scriptSig: null, })
-
-// 3: add output for new address
-tx.vouts.push({ script: p2pkhScript(fromBase58Check(pubKeySendTo)), value: 500, })
-
-// 4: add output for change address
-tx.vouts.push({ script: p2pkhScript(ripemd160(sha256(pubKey))), value: 1000, })
-
-// 5: now that tx is ready, sign and create script sig
+// 2: now that tx is ready, sign and create script sig
 tx.vins[0].scriptSig = compileScript([signp2pkh(tx, 0, privKey, 0x1), pubKey])
 
-// 6: to hex
+// 3: to hex
 const result = txToBuffer(tx).toString('hex')
 console.log('Tx:', result)
 console.log()
