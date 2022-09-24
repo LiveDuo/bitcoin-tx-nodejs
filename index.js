@@ -1,8 +1,7 @@
 const crypto = require('crypto')
 
 const secp256k1 = require('secp256k1')
-
-const bs58check = require('bs58check') // maybe merge
+const base58 = require('bs58')
 
 
 
@@ -211,7 +210,7 @@ const compileScript = (chunks) => {
 
 // refer to https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/address.js
 const fromBase58Check = (address) => {
-  let payload = bs58check.decode(address)
+  let payload = Buffer.from(base58.decode(address).slice(0, -4))
   let version = payload.readUInt8(0)
   let hash = payload.slice(1)
   return { version, hash }
