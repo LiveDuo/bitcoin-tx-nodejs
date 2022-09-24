@@ -2,12 +2,7 @@ const crypto = require('crypto')
 
 const secp256k1 = require('secp256k1')
 
-const bip66 = require('bip66') // maybe merge (node modules)
-const bs58check = require('bs58check') // maybe merge (node modules)
-
-const BN = require('bn.js') // merge (node modules)
-const pushdata = require('pushdata-bitcoin') // merge (node modules)
-
+const bs58check = require('bs58check') // maybe merge
 
 
 
@@ -15,7 +10,7 @@ const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
 
 // https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
-const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, }
+const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, OP_PUSHDATA1: 0x4c, }
 
 class BufferCursor {
   constructor(buffer) {
@@ -32,8 +27,8 @@ class BufferCursor {
   }
 
   writeUInt64LE(value) {
-    if (!(value instanceof BN)) value = new BN(value);
-    this.writeBytes(value.toBuffer('le', 8));
+    const s = Number(value).toString(16).padStart(16, '0')
+    this.writeBytes(Buffer.from(s, 'hex').reverse());
   }
 
   writeBytes(buffer) {
@@ -81,8 +76,67 @@ const varUintEncode = (number, buffer, offset) => {
 
 const varUintEncodingLength = (number) => (number < 0xfd ? 1 : number <= 0xffff ? 3 : number <= 0xffffffff ? 5 : 9)
 
+function bip66Encode (r, s) {
+  var lenR = r.length
+  var lenS = s.length
+  if (lenR === 0) throw new Error('R length is zero')
+  if (lenS === 0) throw new Error('S length is zero')
+  if (lenR > 33) throw new Error('R length is too long')
+  if (lenS > 33) throw new Error('S length is too long')
+  if (r[0] & 0x80) throw new Error('R value is negative')
+  if (s[0] & 0x80) throw new Error('S value is negative')
+  if (lenR > 1 && (r[0] === 0x00) && !(r[1] & 0x80)) throw new Error('R value excessively padded')
+  if (lenS > 1 && (s[0] === 0x00) && !(s[1] & 0x80)) throw new Error('S value excessively padded')
 
+  var signature = Buffer.allocUnsafe(6 + lenR + lenS)
 
+  // 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S]
+  signature[0] = 0x30
+  signature[1] = signature.length - 2
+  signature[2] = 0x02
+  signature[3] = r.length
+  r.copy(signature, 4)
+  signature[4 + lenR] = 0x02
+  signature[5 + lenR] = s.length
+  s.copy(signature, 6 + lenR)
+
+  return signature
+}
+
+// var OPS = require('bitcoin-ops')
+
+function pushdataEncodingLength (i) {
+  return i < OPS.OP_PUSHDATA1 ? 1
+  : i <= 0xff ? 2
+  : i <= 0xffff ? 3
+  : 5
+}
+
+function pushdataEncode (buffer, number, offset) {
+  var size = pushdataEncodingLength(number)
+
+  // ~6 bit
+  if (size === 1) {
+    buffer.writeUInt8(number, offset)
+
+  // 8 bit
+  } else if (size === 2) {
+    buffer.writeUInt8(OPS.OP_PUSHDATA1, offset)
+    buffer.writeUInt8(number, offset + 1)
+
+  // 16 bit
+  } else if (size === 3) {
+    buffer.writeUInt8(OPS.OP_PUSHDATA2, offset)
+    buffer.writeUInt16LE(number, offset + 1)
+
+  // 32 bit
+  } else {
+    buffer.writeUInt8(OPS.OP_PUSHDATA4, offset)
+    buffer.writeUInt32LE(number, offset + 1)
+  }
+
+  return size
+}
 
 
 
@@ -121,7 +175,7 @@ const compileScript = (chunks) => {
       if (chunk.length === 1 && asMinimalOP(chunk) !== undefined) {
         return accum + 1
       }
-      return accum + pushdata.encodingLength(chunk.length) + chunk.length
+      return accum + pushdataEncodingLength(chunk.length) + chunk.length
     }
     // opcode
     return accum + 1
@@ -141,7 +195,7 @@ const compileScript = (chunks) => {
         return
       }
 
-      offset += pushdata.encode(buffer, chunk.length, offset)
+      offset += pushdataEncode(buffer, chunk.length, offset)
       chunk.copy(buffer, offset)
       offset += chunk.length
 
@@ -239,7 +293,7 @@ const encodeSig = (signature, hashType) => {
   const r = toDER(signature.slice(0, 32))
   const s = toDER(signature.slice(32, 64))
 
-  return Buffer.concat([bip66.encode(r, s), hashTypeBuffer])
+  return Buffer.concat([bip66Encode(r, s), hashTypeBuffer])
 }
 
 /////////////////////////////////////////
