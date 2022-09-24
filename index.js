@@ -20,12 +20,12 @@ class BufferCursor {
   }
 
   writeUInt32LE(val) {
-    this._buffer['writeUInt32LE'](val, this._position)
+    this._buffer.writeUInt32LE(val, this._position)
     this._position += 4
   }
 
   writeInt32LE(val) {
-    this._buffer['writeInt32LE'](val, this._position)
+    this._buffer.writeInt32LE(val, this._position)
     this._position += 4
   }
 
@@ -43,9 +43,7 @@ class BufferCursor {
 }
 
 const varUintEncode = (number, buffer, offset) => {
-  if (!buffer) buffer = Buffer.allocUnsafe(varUintEncodingLength(number))
-  if (!Buffer.isBuffer(buffer)) throw new TypeError('buffer must be a Buffer instance')
-  if (!offset) offset = 0
+  if (!buffer) buffer = Buffer.alloc(varUintEncodingLength(number))
 
   // 8 bit
   if (number < 0xfd) {
