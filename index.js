@@ -3,12 +3,12 @@ const crypto = require('crypto')
 const secp256k1 = require('secp256k1')
 const base58 = require('bs58')
 
-// https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
-const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, OP_PUSHDATA1: 0x4c, }
 
 ////////////////////////////////////////////////////////////
 /////   Utils
 ////////////////////////////////////////////////////////////
+
+const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG: 0xac, OP_PUSHDATA1: 0x4c, }
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
@@ -132,7 +132,6 @@ const compileScript = (chunks) => {
   return buffer
 }
 
-// https://en.bitcoin.it/wiki/Transaction#General_format_of_a_Bitcoin_transaction_.28inside_a_block.29
 const getTxSize = (vins, vouts) => {
   return (
     4 + // version
@@ -257,7 +256,6 @@ const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
   return Buffer.concat([encoded, Buffer.from([hashType])])
 }
 
-// https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/payments/p2pkh.js#L58
 const p2pkhScript = (pubKey) => compileScript([ OPS.OP_DUP, OPS.OP_HASH160, pubKey, OPS.OP_EQUALVERIFY, OPS.OP_CHECKSIG ])
 
 
@@ -301,4 +299,10 @@ console.log('Assert:', result === '0200000001a7e576b58b3d074e4c095b2e5557968523c
 
 // Successful Tx: ee3b6f4d03e93d8a2d9e2364488fe2a390d553c45c4d45a67a37852ebbf4a88a (testnet)
 // https://live.blockcypher.com/btc-testnet/tx/ee3b6f4d03e93d8a2d9e2364488fe2a390d553c45c4d45a67a37852ebbf4a88a/
+
+
+// Resources
+// https://github.com/bitcoinjs/bitcoin-ops/blob/master/index.json
+// https://en.bitcoin.it/wiki/Transaction#General_format_of_a_Bitcoin_transaction_.28inside_a_block.29
+// https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/payments/p2pkh.js#L58
 
