@@ -1,11 +1,22 @@
 const OPS = require('bitcoin-ops');
 const secp256k1 = require('secp256k1');
-const { sha256, hash160 } = require('./crypto');
 const bip66 = require('bip66');
 const bs58check = require('bs58check');
 const varuint = require('varuint-bitcoin');
 const pushdata = require('pushdata-bitcoin');
 const BufferCursor = require('./buffer-cursor');
+
+const crypto = require('crypto');
+
+
+
+const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
+const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
+
+const hash160 = (data) => ripemd160(sha256(data))
+// const hash256 = (data) => sha256(sha256(data))
+
+// module.exports = { sha256, ripemd160, hash160, hash256, }
 
 ////////////////////////////////////////////////////////////
 
@@ -19,9 +30,9 @@ let privKey = Buffer.from(
 );
 let pubKey = secp256k1.publicKeyCreate(privKey);
 tx.vins.push({
-  txid: Buffer('515ecb42cacefd5872c4cb5ee124702785137406f85195ba72d2a81bbfa70561', 'hex'),
+  txid: Buffer('cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe', 'hex'),
   vout: 1,
-  hash: Buffer('515ecb42cacefd5872c4cb5ee124702785137406f85195ba72d2a81bbfa70561', 'hex').reverse(),
+  hash: Buffer('cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe', 'hex').reverse(),
   sequence: 0xffffffff,
   script: p2pkhScript(hash160(pubKey)),
   scriptSig: null,
@@ -29,23 +40,14 @@ tx.vins.push({
 
 // 3: add output for new address
 tx.vouts.push({
-  script: p2shScript(
-    hash160(
-      compileScript([
-        // prettier-ignore
-        OPS.OP_SHA256,
-        Buffer.from('253c853e2915f5979e3c6b248b028cc5e3b4e7be3d0884db6c3632fd85702def', 'hex'),
-        OPS.OP_EQUAL,
-      ])
-    )
-  ),
-  value: 9000,
+  script: p2pkhScript(fromBase58Check('mrz1DDxeqypyabBs8N9y3Hybe2LEz2cYBu').hash),
+  value: 900,
 });
 
 // 4: add output for change address
 tx.vouts.push({
   script: p2pkhScript(hash160(pubKey)),
-  value: 11011000,
+  value: 11010000,
 });
 
 // 5: now that tx is ready, sign and create script sig
@@ -56,11 +58,11 @@ let result = txToBuffer(tx).toString('hex');
 console.log(result);
 console.log(
   result ===
-    '02000000016105a7bf1ba8d272ba9551f806741385277024e15ecbc47258fdceca42cb5e51010000006a47304402204ea84c567f2043b6bf677e60ba7f7f13d14b82c9367a5562038b5effd9db7fa602202093b23d7a9e0c0ce7668e75f7c5c674ba34555d9a7e38e94245b422a125d6a8012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02282300000000000017a9140714c97d999d7e3f1c68b015fec735b857e9064987b803a800000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000'
+    '0200000001fe9d7c4be76094189c396cc52b333364f06610fbd1fa95994f79ec8c869785cf010000006a473044022034903565f0c10373ad8884251c1af2b7f5ce029213f052ce10411c6ba090fac1022071f17d776536f800e5e24688ee2a341bbd05a776298287659005257e9948cf6f012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff0284030000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88acd0ffa700000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000'
 );
 
-// bitcoin-cli -testnet sendrawtransaction "02000000016105a7bf1ba8d272ba9551f806741385277024e15ecbc47258fdceca42cb5e51010000006a47304402204ea84c567f2043b6bf677e60ba7f7f13d14b82c9367a5562038b5effd9db7fa602202093b23d7a9e0c0ce7668e75f7c5c674ba34555d9a7e38e94245b422a125d6a8012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff02282300000000000017a9140714c97d999d7e3f1c68b015fec735b857e9064987b803a800000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000"
-// txid: cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe
+// bitcoin-cli -testnet sendrawtransaction "0200000001fe9d7c4be76094189c396cc52b333364f06610fbd1fa95994f79ec8c869785cf010000006a473044022034903565f0c10373ad8884251c1af2b7f5ce029213f052ce10411c6ba090fac1022071f17d776536f800e5e24688ee2a341bbd05a776298287659005257e9948cf6f012102e577d441d501cace792c02bfe2cc15e59672199e2195770a61fd3288fc9f934fffffffff0284030000000000001976a9147dc70ca254627bebcb54c839984d32dad9092edf88acd0ffa700000000001976a914c34015187941b20ecda9378bb3cade86e80d2bfe88ac00000000"
+// txid: 18dc4ec8eca873f93fcc4869f6eaf0624ca91efff0ad86c341cd7edd37a8ae35
 
 ///////////////////////////////////////////////////////////
 
@@ -284,14 +286,5 @@ function p2pkhScript(hash160PubKey) {
     hash160PubKey,
     OPS.OP_EQUALVERIFY,
     OPS.OP_CHECKSIG
-  ]);
-}
-
-function p2shScript(hash160Script) {
-  // prettier-ignore
-  return compileScript([
-    OPS.OP_HASH160,
-    hash160Script,
-    OPS.OP_EQUAL
   ]);
 }
