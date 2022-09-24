@@ -20,12 +20,12 @@ class BufferCursor {
   }
 
   writeUInt32LE(val) {
-    this._buffer[this.writeUInt32LE.name](val, this._position)
+    this._buffer['writeUInt32LE'](val, this._position)
     this._position += 4
   }
 
   writeInt32LE(val) {
-    this._buffer[this.writeInt32LE.name](val, this._position)
+    this._buffer['writeInt32LE'](val, this._position)
     this._position += 4
   }
 
@@ -33,7 +33,7 @@ class BufferCursor {
     const s = Number(value).toString(16).padStart(16, '0')
     const d = Buffer.from(s, 'hex').reverse()
     d.copy(this._buffer, this._position)
-    this._position += d.length
+    this._position += 8
   }
 
   writeBytes(buffer) {
