@@ -13,35 +13,6 @@ const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG:
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
 
-class BufferCursor {
-  constructor(buffer) {
-    this._buffer = buffer
-    this._position = 0
-  }
-
-  writeUInt32LE(val) {
-    this._buffer.writeUInt32LE(val, this._position)
-    this._position += 4
-  }
-
-  writeInt32LE(val) {
-    this._buffer.writeInt32LE(val, this._position)
-    this._position += 4
-  }
-
-  writeUInt64LE(value) {
-    const s = Number(value).toString(16).padStart(16, '0')
-    const d = Buffer.from(s, 'hex').reverse()
-    d.copy(this._buffer, this._position)
-    this._position += 8
-  }
-
-  writeBytes(buffer) {
-    buffer.copy(this._buffer, this._position)
-    this._position += buffer.length
-  }
-}
-
 const varUintEncode = (number, buffer, offset) => {
   if (!buffer) buffer = Buffer.alloc(varUintEncodingLength(number))
 
@@ -72,28 +43,16 @@ const varUintEncode = (number, buffer, offset) => {
 const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
 
 const bip66Encode = (r, s) => {
-  const lenR = r.length
-  const lenS = s.length
-  if (lenR === 0) throw new Error('R length is zero')
-  if (lenS === 0) throw new Error('S length is zero')
-  if (lenR > 33) throw new Error('R length is too long')
-  if (lenS > 33) throw new Error('S length is too long')
-  if (r[0] & 0x80) throw new Error('R value is negative')
-  if (s[0] & 0x80) throw new Error('S value is negative')
-  if (lenR > 1 && (r[0] === 0x00) && !(r[1] & 0x80)) throw new Error('R value excessively padded')
-  if (lenS > 1 && (s[0] === 0x00) && !(s[1] & 0x80)) throw new Error('S value excessively padded')
-
-  const signature = Buffer.allocUnsafe(6 + lenR + lenS)
-
-  // 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S]
+  const signature = Buffer.alloc(6 + r.length + s.length)
   signature[0] = 0x30
   signature[1] = signature.length - 2
   signature[2] = 0x02
   signature[3] = r.length
   r.copy(signature, 4)
-  signature[4 + lenR] = 0x02
-  signature[5 + lenR] = s.length
-  s.copy(signature, 6 + lenR)
+  
+  signature[4 + r.length] = 0x02
+  signature[5 + r.length] = s.length
+  s.copy(signature, 6 + r.length)
 
   return signature
 }
@@ -190,43 +149,75 @@ const getTxSize = (vins, vouts) => {
 }
 
 const txToBuffer = (tx) => {
-  const buffer = Buffer.alloc(getTxSize(tx.vins, tx.vouts))
-  const cursor = new BufferCursor(buffer)
-
+  const _buffer = Buffer.alloc(getTxSize(tx.vins, tx.vouts))
+  let _position = 0
+  
   // version
-  cursor.writeInt32LE(tx.version)
+  _buffer.writeInt32LE(tx.version, _position)
+  _position += 4
 
   // vin length
-  cursor.writeBytes(varUintEncode(tx.vins.length))
+  b = varUintEncode(tx.vins.length)
+  b.copy(_buffer, _position)
+  _position += b.length
 
   // vin
   for (let vin of tx.vins) {
-    cursor.writeBytes(vin.hash)
-    cursor.writeUInt32LE(vin.vout)
+    b = vin.hash
+    b.copy(_buffer, _position)
+    _position += b.length
+    
+    _buffer.writeUInt32LE(vin.vout, _position)
+    _position += 4
+
     if (vin.scriptSig) {
-      cursor.writeBytes(varUintEncode(vin.scriptSig.length))
-      cursor.writeBytes(vin.scriptSig)
+      b = varUintEncode(vin.scriptSig.length)
+      b.copy(_buffer, _position)
+      _position += b.length
+
+      b = vin.scriptSig
+      b.copy(_buffer, _position)
+      _position += b.length
+      
     } else {
-      cursor.writeBytes(varUintEncode(vin.script.length))
-      cursor.writeBytes(vin.script)
+      b = varUintEncode(vin.script.length)
+      b.copy(_buffer, _position)
+      _position += b.length
+
+      b = vin.script
+      b.copy(_buffer, _position)
+      _position += b.length
     }
-    cursor.writeUInt32LE(vin.sequence)
+    _buffer.writeUInt32LE(vin.sequence, _position)
+    _position += 4
   }
 
   // vout length
-  cursor.writeBytes(varUintEncode(tx.vouts.length))
-
+  b = varUintEncode(tx.vouts.length)
+  b.copy(_buffer, _position)
+  _position += b.length
+  
   // vouts
   for (let vout of tx.vouts) {
-    cursor.writeUInt64LE(vout.value)
-    cursor.writeBytes(varUintEncode(vout.script.length))
-    cursor.writeBytes(vout.script)
+    const s = Number(vout.value).toString(16).padStart(16, '0')
+    const d = Buffer.from(s, 'hex').reverse()
+    d.copy(_buffer, _position)
+    _position += 8
+
+    b = varUintEncode(vout.script.length)
+    b.copy(_buffer, _position)
+    _position += b.length
+  
+    b = vout.script
+    b.copy(_buffer, _position)
+    _position += b.length
   }
 
   // locktime
-  cursor.writeUInt32LE(tx.locktime)
+  _buffer.writeUInt32LE(tx.locktime, _position)
+  _position += 4
 
-  return buffer
+  return _buffer
 }
 
 const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
