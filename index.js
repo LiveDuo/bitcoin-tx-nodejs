@@ -30,9 +30,9 @@ let privKey = Buffer.from(
 );
 let pubKey = secp256k1.publicKeyCreate(privKey);
 tx.vins.push({
-  txid: Buffer('cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe', 'hex'),
+  txid: Buffer.from('cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe', 'hex'),
   vout: 1,
-  hash: Buffer('cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe', 'hex').reverse(),
+  hash: Buffer.from('cf8597868cec794f9995fad1fb1066f06433332bc56c399c189460e74b7c9dfe', 'hex').reverse(),
   sequence: 0xffffffff,
   script: p2pkhScript(hash160(pubKey)),
   scriptSig: null,
