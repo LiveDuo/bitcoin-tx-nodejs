@@ -6,8 +6,10 @@ const bip66 = require('bip66') // maybe merge (node modules)
 const bs58check = require('bs58check') // maybe merge (node modules)
 
 const BN = require('bn.js') // merge (node modules)
-const varuint = require('varuint-bitcoin') // merge (node modules)
 const pushdata = require('pushdata-bitcoin') // merge (node modules)
+
+
+
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
@@ -48,30 +50,57 @@ class BufferCursor {
   }
 }
 
+const varUintEncode = (number, buffer, offset) => {
+  if (!buffer) buffer = Buffer.allocUnsafe(varUintEncodingLength(number))
+  if (!Buffer.isBuffer(buffer)) throw new TypeError('buffer must be a Buffer instance')
+  if (!offset) offset = 0
 
+  // 8 bit
+  if (number < 0xfd) {
+    buffer.writeUInt8(number, offset)
 
+  // 16 bit
+  } else if (number <= 0xffff) {
+    buffer.writeUInt8(0xfd, offset)
+    buffer.writeUInt16LE(number, offset + 1)
 
+  // 32 bit
+  } else if (number <= 0xffffffff) {
+    buffer.writeUInt8(0xfe, offset)
+    buffer.writeUInt32LE(number, offset + 1)
 
+  // 64 bit
+  } else {
+    buffer.writeUInt8(0xff, offset)
+    buffer.writeUInt32LE(number >>> 0, offset + 1)
+    buffer.writeUInt32LE((number / 0x100000000) | 0, offset + 5)
+  }
 
-
-
-
-
-
-const cloneBuffer = (buffer) => {
-  let result = Buffer.alloc(buffer.length)
-  buffer.copy(result)
-  return result
+  return buffer
 }
+
+const varUintEncodingLength = (number) => (number < 0xfd ? 1 : number <= 0xffff ? 3 : number <= 0xffffffff ? 5 : 9)
+
+
+
+
+
+
+
+
+
+
+
+
 
 const cloneTx = (tx) => {
   let result = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
   for (let vin of tx.vins) {
-    result.vins.push({ txid: cloneBuffer(vin.txid), vout: vin.vout, hash: cloneBuffer(vin.hash),
-      sequence: vin.sequence, script: cloneBuffer(vin.script), scriptPub: null, })
+    result.vins.push({ txid: vin.txid, vout: vin.vout, hash: vin.hash,
+      sequence: vin.sequence, script: vin.script, scriptPub: null, })
   }
   for (let vout of tx.vouts) {
-    result.vouts.push({ script: cloneBuffer(vout.script), value: vout.value, })
+    result.vouts.push({ script: vout.script, value: vout.value, })
   }
   return result
 }
@@ -138,14 +167,14 @@ const fromBase58Check = (address) => {
 const calcTxBytes = (vins, vouts) => {
   return (
     4 + // version
-    varuint.encodingLength(vins.length) +
+    varUintEncodingLength(vins.length) +
     vins
       .map(vin => (vin.scriptSig ? vin.scriptSig.length : vin.script.length))
-      .reduce((sum, len) => sum + 40 + varuint.encodingLength(len) + len, 0) +
-    varuint.encodingLength(vouts.length) +
+      .reduce((sum, len) => sum + 40 + varUintEncodingLength(len) + len, 0) +
+      varUintEncodingLength(vouts.length) +
     vouts
       .map(vout => vout.script.length)
-      .reduce((sum, len) => sum + 8 + varuint.encodingLength(len) + len, 0) +
+      .reduce((sum, len) => sum + 8 + varUintEncodingLength(len) + len, 0) +
     4 // locktime
   )
 }
@@ -158,29 +187,29 @@ const txToBuffer = (tx) => {
   cursor.writeInt32LE(tx.version)
 
   // vin length
-  cursor.writeBytes(varuint.encode(tx.vins.length))
+  cursor.writeBytes(varUintEncode(tx.vins.length))
 
   // vin
   for (let vin of tx.vins) {
     cursor.writeBytes(vin.hash)
     cursor.writeUInt32LE(vin.vout)
     if (vin.scriptSig) {
-      cursor.writeBytes(varuint.encode(vin.scriptSig.length))
+      cursor.writeBytes(varUintEncode(vin.scriptSig.length))
       cursor.writeBytes(vin.scriptSig)
     } else {
-      cursor.writeBytes(varuint.encode(vin.script.length))
+      cursor.writeBytes(varUintEncode(vin.script.length))
       cursor.writeBytes(vin.script)
     }
     cursor.writeUInt32LE(vin.sequence)
   }
 
   // vout length
-  cursor.writeBytes(varuint.encode(tx.vouts.length))
+  cursor.writeBytes(varUintEncode(tx.vouts.length))
 
   // vouts
   for (let vout of tx.vouts) {
     cursor.writeUInt64LE(vout.value)
-    cursor.writeBytes(varuint.encode(vout.script.length))
+    cursor.writeBytes(varUintEncode(vout.script.length))
     cursor.writeBytes(vout.script)
   }
 
@@ -247,10 +276,6 @@ const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
   return encodeSig(sig.signature, hashType)
 }
 
-const p2pkhScriptSig = (sig, pubkey) => {
-  return compileScript([sig, pubkey])
-}
-
 // Refer to:
 // https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/src/payments/p2pkh.js#L58
 const p2pkhScript = (hash160PubKey) => {
@@ -291,7 +316,7 @@ tx.vouts.push({ script: p2pkhScript(fromBase58Check(pubKeySendTo).hash), value: 
 tx.vouts.push({ script: p2pkhScript(ripemd160(sha256(pubKey))), value: 11010000, })
 
 // 5: now that tx is ready, sign and create script sig
-tx.vins[0].scriptSig = p2pkhScriptSig(signp2pkh(tx, 0, privKey, 0x1), pubKey)
+tx.vins[0].scriptSig = compileScript([signp2pkh(tx, 0, privKey, 0x1), pubKey])
 
 // 6: to hex
 const result = txToBuffer(tx).toString('hex')
