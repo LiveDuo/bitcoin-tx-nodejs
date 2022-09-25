@@ -12,7 +12,7 @@ const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG:
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
-const reverse = (data, length) => Number(data).toString(16).padStart(length, '0').match(/[a-fA-F0-9]{2}/g).reverse().join('')
+const reverse = (data, length) => Number(data).toString(16).padStart(length, '0').match(/../g).reverse().join('')
 
 // TODO: should double check with larger values
 const varUintEncode = (number) => {
