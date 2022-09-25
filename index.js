@@ -50,15 +50,6 @@ const bip66Encode = (r, s) => {
 
 const fromBase58Check = (address) => Buffer.from(base58.decode(address).slice(0, -4)).subarray(1)
 
-const toDER = (x) => {
-  let i = 0
-  while (x[i] === 0) ++i
-  if (i === x.length) return Buffer.alloc(1)
-  x = x.slice(i)
-  if (x[0] & 0x80) return Buffer.concat([Buffer.alloc(1), x], 1 + x.length)
-  return x
-}
-
 
 ////////////////////////////////////////////////////////////
 /////   Helpers
@@ -172,7 +163,7 @@ const signp2pkh = (tx, vindex, privKey, hashType) => {
   const txSig = secp256k1.sign(txHash, privKey).signature
 
   // encode sig
-  const sigEncoded = bip66Encode(toDER(txSig.slice(0, 32)), toDER(txSig.slice(32, 64)))
+  const sigEncoded = bip66Encode(txSig.slice(0, 32), txSig.slice(32, 64))
   return Buffer.concat([sigEncoded, Buffer.from([hashType])])
 }
 
