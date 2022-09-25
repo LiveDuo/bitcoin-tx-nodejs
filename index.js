@@ -12,6 +12,7 @@ const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG:
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
+const reverse = (data, length) => Number(data).toString(16).padStart(length, '0').match(/[a-fA-F0-9]{2}/g).reverse().join('')
 
 const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
 
@@ -60,88 +61,32 @@ const compileScript = (chunks) => {
   return Buffer.concat(chunks.map(c => Buffer.isBuffer(c) ? Buffer.concat([Buffer.from([c.length]), c]) : Buffer.from([c])))
 }
 
-const getTxSize = (vins, vouts) => {
-  const versionSize = 4
-  const vinsSize = vins
-    .map(vin => (vin.scriptSig?.length ?? vin.script.length))
-    .reduce((sum, len) => sum + 40 + varUintEncodingLength(len) + len, 0) + varUintEncodingLength(vouts.length)
-  const voutsSize = vouts
-    .map(vout => vout.script.length)
-    .reduce((sum, len) => sum + 8 + varUintEncodingLength(len) + len, 0)
-  const locktime = 4
-  return versionSize + varUintEncodingLength(vins.length) + vinsSize + voutsSize + locktime
-}
-
 const txToBuffer = (tx) => {
-  const _buffer = Buffer.alloc(getTxSize(tx.vins, tx.vouts))
-  let _position = 0
+  const chunks = []
+
+  // header
+  chunks.push(Buffer.from(reverse(tx.version, 8), 'hex'))
   
-  // version
-  _buffer.writeInt32LE(tx.version, _position)
-  _position += 4
-
-  // vin length
-  b = varUintEncode(tx.vins.length)
-  b.copy(_buffer, _position)
-  _position += b.length
-
   // vin
+  chunks.push(varUintEncode(tx.vins.length))
   for (let vin of tx.vins) {
-    b = vin.hash
-    b.copy(_buffer, _position)
-    _position += b.length
-    
-    _buffer.writeUInt32LE(vin.vout, _position)
-    _position += 4
-
-    if (vin.scriptSig) {
-      b = varUintEncode(vin.scriptSig.length)
-      b.copy(_buffer, _position)
-      _position += b.length
-
-      b = vin.scriptSig
-      b.copy(_buffer, _position)
-      _position += b.length
-      
-    } else {
-      b = varUintEncode(vin.script.length)
-      b.copy(_buffer, _position)
-      _position += b.length
-
-      b = vin.script
-      b.copy(_buffer, _position)
-      _position += b.length
-    }
-    _buffer.writeUInt32LE(vin.sequence, _position)
-    _position += 4
+    chunks.push(vin.hash)
+    chunks.push(Buffer.from(reverse(vin.vout, 8), 'hex'))
+    if (vin.scriptSig) chunks.push(varUintEncode(vin.scriptSig.length), vin.scriptSig)
+    else chunks.push(varUintEncode(vin.script.length), vin.script)
+    chunks.push(Buffer.from(vin.sequence.toString(16), 'hex'))
   }
 
-  // vout length
-  b = varUintEncode(tx.vouts.length)
-  b.copy(_buffer, _position)
-  _position += b.length
-  
-  // vouts
+  // vout
+  chunks.push(varUintEncode(tx.vouts.length))
   for (let vout of tx.vouts) {
-    const s = Number(vout.value).toString(16).padStart(16, '0')
-    const d = Buffer.from(s, 'hex').reverse()
-    d.copy(_buffer, _position)
-    _position += 8
-
-    b = varUintEncode(vout.script.length)
-    b.copy(_buffer, _position)
-    _position += b.length
-  
-    b = vout.script
-    b.copy(_buffer, _position)
-    _position += b.length
+    chunks.push(Buffer.from(reverse(vout.value, 16), 'hex'), varUintEncode(vout.script.length), vout.script)
   }
 
   // locktime
-  _buffer.writeUInt32LE(tx.locktime, _position)
-  _position += 4
+  chunks.push(Buffer.from(reverse(tx.locktime, 8), 'hex'))
 
-  return _buffer
+  return Buffer.concat(chunks)
 }
 
 const signp2pkh = (tx, vindex, privKey, hashType) => {
@@ -155,8 +100,7 @@ const signp2pkh = (tx, vindex, privKey, hashType) => {
   txClone.vins = txClone.vins.map((r, i) => i === vindex ? r : {...r, script: Buffer.alloc(0)})
 
   // write to buffer, extend and append hash type
-  const hashTypeReverse = hashType.toString(16).padStart(8, '0').match(/[a-fA-F0-9]{2}/g).reverse().join('')
-  const txBuffer = Buffer.concat([txToBuffer(txClone), Buffer.from(hashTypeReverse, 'hex')])
+  const txBuffer = Buffer.concat([txToBuffer(txClone), Buffer.from(reverse(hashType, 8), 'hex')])
   
   // sign input
   const txHash = sha256(sha256(txBuffer))
