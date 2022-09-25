@@ -14,34 +14,12 @@ const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
 const reverse = (data, length) => Number(data).toString(16).padStart(length, '0').match(/[a-fA-F0-9]{2}/g).reverse().join('')
 
-const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
-
+// TODO: should double check with larger values
 const varUintEncode = (number) => {
-
-  if (number < 0xfd) { // 8 bit
-    const buffer = Buffer.alloc(varUintEncodingLength(number))
-    buffer.writeUInt8(number, 0)
-    return buffer
-  } else if (number <= 0xffff) { // 16 bit
-    const buffer = Buffer.alloc(varUintEncodingLength(number))
-    buffer.writeUInt8(0xfd, 0)
-    buffer.writeUInt16LE(number, 1)
-    return buffer
-  } else if (number <= 0xffffffff) { // 32 bit
-    const buffer = Buffer.alloc(varUintEncodingLength(number))
-    buffer.writeUInt8(0xfe, 0)
-    buffer.writeUInt32LE(number, 1)
-    return buffer
-  } else { // 64 bit
-    const buffer = Buffer.alloc(varUintEncodingLength(number))
-    buffer.writeUInt8(0xff, 0)
-    buffer.writeUInt32LE(number >>> 0, 1)
-    buffer.writeUInt32LE((number / 0x100000000) | 0, 5)
-    return buffer
-  }
-
-  
-
+  if (number < 2^8) return Buffer.from(reverse(number, 2), 'hex') // 8 bit
+  else if (number <= 2^16) return Buffer.from(reverse(number, 4), 'hex') // 16 bit
+  else if (number <= 2^32) return Buffer.from(reverse(number, 8), 'hex') // 32 bit
+  else return Buffer.from(reverse(number, 16), 'hex') // 64 bit
 }
 
 const bip66Encode = (r, s) => {
