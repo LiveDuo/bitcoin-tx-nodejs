@@ -103,48 +103,19 @@ const toDER = (x) => {
 
 
 const compileScript = (chunks) => {
-  const bufferSize = chunks.reduce((accum, chunk) => {
-    // data chunk
-    if (Buffer.isBuffer(chunk)) {
-      return accum + pushdataEncodingLength(chunk.length) + chunk.length
-    }
-    // opcode
-    return accum + 1
-  }, 0.0)
-
-  const buffer = Buffer.alloc(bufferSize)
-  let offset = 0
-
-  chunks.forEach(chunk => {
-    // data chunk
-    if (Buffer.isBuffer(chunk)) {
-      offset += pushdataEncode(buffer, chunk.length, offset)
-      chunk.copy(buffer, offset)
-      offset += chunk.length
-
-      // opcode
-    } else {
-      buffer.writeUInt8(chunk, offset)
-      offset += 1
-    }
-  })
-  if (offset !== buffer.length) throw new Error('Could not decode chunks')
-  return buffer
+  return Buffer.concat(chunks.map(c => Buffer.isBuffer(c) ? Buffer.concat([Buffer.from([c.length]), c]) : Buffer.from([c])))
 }
 
 const getTxSize = (vins, vouts) => {
-  return (
-    4 + // version
-    varUintEncodingLength(vins.length) +
-    vins
-      .map(vin => (vin.scriptSig ? vin.scriptSig.length : vin.script.length))
-      .reduce((sum, len) => sum + 40 + varUintEncodingLength(len) + len, 0) +
-      varUintEncodingLength(vouts.length) +
-    vouts
-      .map(vout => vout.script.length)
-      .reduce((sum, len) => sum + 8 + varUintEncodingLength(len) + len, 0) +
-    4 // locktime
-  )
+  const versionSize = 4
+  const vinsSize = vins
+    .map(vin => (vin.scriptSig?.length ?? vin.script.length))
+    .reduce((sum, len) => sum + 40 + varUintEncodingLength(len) + len, 0) + varUintEncodingLength(vouts.length)
+  const voutsSize = vouts
+    .map(vout => vout.script.length)
+    .reduce((sum, len) => sum + 8 + varUintEncodingLength(len) + len, 0)
+  const locktime = 4
+  return versionSize + varUintEncodingLength(vins.length) + vinsSize + voutsSize + locktime
 }
 
 const txToBuffer = (tx) => {
@@ -219,7 +190,7 @@ const txToBuffer = (tx) => {
   return _buffer
 }
 
-const signp2pkh = (tx, vindex, privKey, hashType = 0x01) => {
+const signp2pkh = (tx, vindex, privKey, hashType) => {
 
   const clone = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
   for (let vin of tx.vins) {
@@ -284,7 +255,7 @@ const tx = {
   vouts: [{ script: voutScript1, value: 500, }, { script: voutScript2, value: 1000, }]
 }
 
-// 2: now that tx is ready, sign and create script sig
+// sign the tx by filling the script sig
 tx.vins[0].scriptSig = compileScript([signp2pkh(tx, 0, privKey, 0x1), pubKey])
 
 // 3: to hex
