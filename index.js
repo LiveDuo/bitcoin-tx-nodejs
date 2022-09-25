@@ -155,37 +155,25 @@ const txToBuffer = (tx) => {
 
 const signp2pkh = (tx, vindex, privKey, hashType) => {
 
-  const txClone = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
-  for (let vin of tx.vins) {
-    txClone.vins.push({ txid: vin.txid, vout: vin.vout, hash: vin.hash,
-      sequence: vin.sequence, script: vin.script, scriptPub: null, })
-  }
-  for (let vout of tx.vouts) {
-    txClone.vouts.push({ script: vout.script, value: vout.value, })
-  }
+  const txClone = { ...tx }
 
   // clean up relevant script
-  const filteredPrevOutScript = txClone.vins[vindex].script.filter(op => op !== OPS.OP_CODESEPARATOR)
-  txClone.vins[vindex].script = filteredPrevOutScript
+  txClone.vins[vindex].script = txClone.vins[vindex].script.filter(op => op !== OPS.OP_CODESEPARATOR)
 
   // zero out scripts of other inputs
-  for (let i = 0; i < txClone.vins.length; i++) {
-    if (i === vindex) continue
-    txClone.vins[i].script = Buffer.alloc(0)
-  }
+  txClone.vins = txClone.vins.map((r, i) => i === vindex ? r : {...r, script: Buffer.alloc(0)})
 
   // write to buffer, extend and append hash type
-  let buffer = txToBuffer(txClone)
-  buffer = Buffer.alloc(buffer.length + 4, buffer)
-  buffer.writeInt32LE(hashType, buffer.length - 4)
+  const hashTypeReverse = hashType.toString(16).padStart(8, '0').match(/[a-fA-F0-9]{2}/g).reverse().join('')
+  const txBuffer = Buffer.concat([txToBuffer(txClone), Buffer.from(hashTypeReverse, 'hex')])
   
   // sign input
-  const hash = sha256(sha256(buffer))
-  const sig = secp256k1.sign(hash, privKey).signature
+  const txHash = sha256(sha256(txBuffer))
+  const txSig = secp256k1.sign(txHash, privKey).signature
 
   // encode sig
-  const encoded = bip66Encode(toDER(sig.slice(0, 32)), toDER(sig.slice(32, 64)))
-  return Buffer.concat([encoded, Buffer.from([hashType])])
+  const sigEncoded = bip66Encode(toDER(txSig.slice(0, 32)), toDER(txSig.slice(32, 64)))
+  return Buffer.concat([sigEncoded, Buffer.from([hashType])])
 }
 
 const p2pkhScript = (pubKey) => compileScript([ OPS.OP_DUP, OPS.OP_HASH160, pubKey, OPS.OP_EQUALVERIFY, OPS.OP_CHECKSIG ])
