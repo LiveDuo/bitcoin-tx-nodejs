@@ -16,31 +16,32 @@ const reverse = (data, length) => Number(data).toString(16).padStart(length, '0'
 
 const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
 
-const varUintEncode = (number, buffer, offset) => {
-  if (!buffer) buffer = Buffer.alloc(varUintEncodingLength(number))
+const varUintEncode = (number) => {
 
-  // 8 bit
-  if (number < 0xfd) {
-    buffer.writeUInt8(number, offset)
-
-  // 16 bit
-  } else if (number <= 0xffff) {
-    buffer.writeUInt8(0xfd, offset)
-    buffer.writeUInt16LE(number, offset + 1)
-
-  // 32 bit
-  } else if (number <= 0xffffffff) {
-    buffer.writeUInt8(0xfe, offset)
-    buffer.writeUInt32LE(number, offset + 1)
-
-  // 64 bit
-  } else {
-    buffer.writeUInt8(0xff, offset)
-    buffer.writeUInt32LE(number >>> 0, offset + 1)
-    buffer.writeUInt32LE((number / 0x100000000) | 0, offset + 5)
+  if (number < 0xfd) { // 8 bit
+    const buffer = Buffer.alloc(varUintEncodingLength(number))
+    buffer.writeUInt8(number, 0)
+    return buffer
+  } else if (number <= 0xffff) { // 16 bit
+    const buffer = Buffer.alloc(varUintEncodingLength(number))
+    buffer.writeUInt8(0xfd, 0)
+    buffer.writeUInt16LE(number, 1)
+    return buffer
+  } else if (number <= 0xffffffff) { // 32 bit
+    const buffer = Buffer.alloc(varUintEncodingLength(number))
+    buffer.writeUInt8(0xfe, 0)
+    buffer.writeUInt32LE(number, 1)
+    return buffer
+  } else { // 64 bit
+    const buffer = Buffer.alloc(varUintEncodingLength(number))
+    buffer.writeUInt8(0xff, 0)
+    buffer.writeUInt32LE(number >>> 0, 1)
+    buffer.writeUInt32LE((number / 0x100000000) | 0, 5)
+    return buffer
   }
 
-  return buffer
+  
+
 }
 
 const bip66Encode = (r, s) => {
