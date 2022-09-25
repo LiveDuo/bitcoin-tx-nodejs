@@ -13,6 +13,8 @@ const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG:
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
 
+const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
+
 const varUintEncode = (number, buffer, offset) => {
   if (!buffer) buffer = Buffer.alloc(varUintEncodingLength(number))
 
@@ -39,8 +41,6 @@ const varUintEncode = (number, buffer, offset) => {
 
   return buffer
 }
-
-const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
 
 const bip66Encode = (r, s) => {
   const rP = Buffer.from([0x30, r.length + s.length + 4, 0x02, r.length])
@@ -155,27 +155,27 @@ const txToBuffer = (tx) => {
 
 const signp2pkh = (tx, vindex, privKey, hashType) => {
 
-  const clone = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
+  const txClone = { version: tx.version, locktime: tx.locktime, vins: [], vouts: [] }
   for (let vin of tx.vins) {
-    clone.vins.push({ txid: vin.txid, vout: vin.vout, hash: vin.hash,
+    txClone.vins.push({ txid: vin.txid, vout: vin.vout, hash: vin.hash,
       sequence: vin.sequence, script: vin.script, scriptPub: null, })
   }
   for (let vout of tx.vouts) {
-    clone.vouts.push({ script: vout.script, value: vout.value, })
+    txClone.vouts.push({ script: vout.script, value: vout.value, })
   }
 
   // clean up relevant script
-  const filteredPrevOutScript = clone.vins[vindex].script.filter(op => op !== OPS.OP_CODESEPARATOR)
-  clone.vins[vindex].script = filteredPrevOutScript
+  const filteredPrevOutScript = txClone.vins[vindex].script.filter(op => op !== OPS.OP_CODESEPARATOR)
+  txClone.vins[vindex].script = filteredPrevOutScript
 
   // zero out scripts of other inputs
-  for (let i = 0; i < clone.vins.length; i++) {
+  for (let i = 0; i < txClone.vins.length; i++) {
     if (i === vindex) continue
-    clone.vins[i].script = Buffer.alloc(0)
+    txClone.vins[i].script = Buffer.alloc(0)
   }
 
-  // write to the buffer, extend and append hash type and append the hash type
-  let buffer = txToBuffer(clone)
+  // write to buffer, extend and append hash type
+  let buffer = txToBuffer(txClone)
   buffer = Buffer.alloc(buffer.length + 4, buffer)
   buffer.writeInt32LE(hashType, buffer.length - 4)
   
