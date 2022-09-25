@@ -13,6 +13,7 @@ const OPS = { OP_DUP: 0x76, OP_EQUALVERIFY: 0x88, OP_HASH160: 0xa9, OP_CHECKSIG:
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest()
 const ripemd160 = (data) => crypto.createHash('ripemd160').update(data).digest()
 const reverse = (data, length) => Number(data).toString(16).padStart(length, '0').match(/../g).reverse().join('')
+const base58Check = (data) => Buffer.from(base58.decode(data).slice(0, -4)).subarray(1)
 
 // TODO: should double check with larger values
 const varUintEncode = (number) => {
@@ -27,8 +28,6 @@ const bip66Encode = (r, s) => {
   const sP = Buffer.from([0x02, s.length])
   return Buffer.concat([rP, r, sP, s])
 }
-
-const fromBase58Check = (address) => Buffer.from(base58.decode(address).slice(0, -4)).subarray(1)
 
 
 ////////////////////////////////////////////////////////////
@@ -109,7 +108,7 @@ console.log()
 
 // 1: add inputs and output for new address and change address
 const vinScript = p2pkhScript(ripemd160(sha256(pubKey)))
-const voutScript1 = p2pkhScript(fromBase58Check(pubKeySendTo))
+const voutScript1 = p2pkhScript(base58Check(pubKeySendTo))
 const voutScript2 = p2pkhScript(ripemd160(sha256(pubKey)))
 const tx = {
   version: 2,
