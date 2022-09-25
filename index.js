@@ -29,6 +29,12 @@ const bip66Encode = (r, s) => {
   return Buffer.concat([rP, r, sP, s])
 }
 
+const getAddressFromPubKey = (pubKey) => {
+  const networkId = '6f' // 00 for mainnet - 6f for testnet
+  const hash = Buffer.concat([Buffer.from(networkId, 'hex'), ripemd160(sha256(pubKey))])
+  const address = base58.encode(Buffer.concat([hash, sha256(sha256(hash)).subarray(0, 4)]))
+  return address
+}
 
 ////////////////////////////////////////////////////////////
 /////   Helpers
@@ -97,15 +103,11 @@ const p2pkhScript = (pubKey) => compileScript([ OPS.OP_DUP, OPS.OP_HASH160, pubK
 ////////////////////////////////////////////////////////////
 
 const privKey = Buffer.from('60226ca8fb12f6c8096011f36c5028f8b7850b63d495bc45ec3ca478a29b473d', 'hex')
-
 const txid = Buffer.from('f633c7f9f445cc7a241da277169fcd23859657552e5b094c4e073d8bb576e5a7', 'hex')
-
 const pubKeySendTo = 'mrz1DDxeqypyabBs8N9y3Hybe2LEz2cYBu'
 
 const pubKey = secp256k1.publicKeyCreate(privKey)
-const hash = Buffer.concat([Buffer.from('6f', 'hex'), ripemd160(sha256(Buffer.from(pubKey.toString('hex'), 'hex')))])
-const address = base58.encode(Buffer.concat([hash, sha256(sha256(hash)).subarray(0, 4)]))
-console.log('Address:', address)
+console.log('Address:', getAddressFromPubKey(pubKey))
 console.log()
 
 // 1: add inputs and output for new address and change address
