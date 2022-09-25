@@ -43,46 +43,9 @@ const varUintEncode = (number, buffer, offset) => {
 const varUintEncodingLength = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9)
 
 const bip66Encode = (r, s) => {
-  const signature = Buffer.alloc(6 + r.length + s.length)
-  signature[0] = 0x30
-  signature[1] = signature.length - 2
-  signature[2] = 0x02
-  signature[3] = r.length
-  r.copy(signature, 4)
-  
-  signature[4 + r.length] = 0x02
-  signature[5 + r.length] = s.length
-  s.copy(signature, 6 + r.length)
-
-  return signature
-}
-
-const pushdataEncodingLength = (i) => i < OPS.OP_PUSHDATA1 ? 1 : i <= 0xff ? 2 : i <= 0xffff ? 3 : 5
-
-const pushdataEncode = (buffer, number, offset) => {
-  const size = pushdataEncodingLength(number)
-
-  // ~6 bit
-  if (size === 1) {
-    buffer.writeUInt8(number, offset)
-
-  // 8 bit
-  } else if (size === 2) {
-    buffer.writeUInt8(OPS.OP_PUSHDATA1, offset)
-    buffer.writeUInt8(number, offset + 1)
-
-  // 16 bit
-  } else if (size === 3) {
-    buffer.writeUInt8(OPS.OP_PUSHDATA2, offset)
-    buffer.writeUInt16LE(number, offset + 1)
-
-  // 32 bit
-  } else {
-    buffer.writeUInt8(OPS.OP_PUSHDATA4, offset)
-    buffer.writeUInt32LE(number, offset + 1)
-  }
-
-  return size
+  const rP = Buffer.from([0x30, r.length + s.length + 4, 0x02, r.length])
+  const sP = Buffer.from([0x02, s.length])
+  return Buffer.concat([rP, r, sP, s])
 }
 
 const fromBase58Check = (address) => Buffer.from(base58.decode(address).slice(0, -4)).subarray(1)
@@ -215,11 +178,9 @@ const signp2pkh = (tx, vindex, privKey, hashType) => {
   let buffer = txToBuffer(clone)
   buffer = Buffer.alloc(buffer.length + 4, buffer)
   buffer.writeInt32LE(hashType, buffer.length - 4)
-
-  // double-sha256
-  const hash = sha256(sha256(buffer))
-
+  
   // sign input
+  const hash = sha256(sha256(buffer))
   const sig = secp256k1.sign(hash, privKey).signature
 
   // encode sig
